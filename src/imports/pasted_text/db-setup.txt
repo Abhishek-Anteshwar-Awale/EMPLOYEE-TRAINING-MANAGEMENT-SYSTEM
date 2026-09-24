@@ -1,0 +1,198 @@
+-- Trainova — one-time database setup (safe to re-run)
+-- Paste this in: https://supabase.com/dashboard/project/raozwxavlpgvzjxkrjit/sql/new
+
+CREATE TABLE IF NOT EXISTS employees (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_code text UNIQUE NOT NULL,
+  name text NOT NULL,
+  email text,
+  department text NOT NULL,
+  role text NOT NULL,
+  status text NOT NULL DEFAULT 'active',
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS trainings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code text UNIQUE NOT NULL,
+  name text NOT NULL,
+  frequency text NOT NULL,
+  description text DEFAULT '',
+  status text NOT NULL DEFAULT 'active',
+  created_by text DEFAULT 'HR Admin',
+  is_deleted boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS employee_groups (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  type text NOT NULL DEFAULT 'all',
+  department text,
+  description text,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS employee_group_members (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id uuid NOT NULL REFERENCES employee_groups(id) ON DELETE CASCADE,
+  employee_id uuid NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  UNIQUE(group_id, employee_id)
+);
+
+CREATE TABLE IF NOT EXISTS training_schedules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  training_id uuid NOT NULL REFERENCES trainings(id),
+  group_id uuid NOT NULL REFERENCES employee_groups(id),
+  session_date date NOT NULL,
+  trainer text NOT NULL,
+  frequency text NOT NULL DEFAULT 'As Required',
+  status text NOT NULL DEFAULT 'upcoming',
+  notes text,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS attendance_records (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  schedule_id uuid NOT NULL REFERENCES training_schedules(id) ON DELETE CASCADE,
+  employee_id uuid NOT NULL REFERENCES employees(id),
+  attendance text NOT NULL DEFAULT 'not-marked',
+  completion_status text NOT NULL DEFAULT 'pending',
+  marked_at timestamptz,
+  marked_by text,
+  UNIQUE(schedule_id, employee_id)
+);
+
+-- Enable Row Level Security
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trainings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE training_schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE attendance_records ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies before recreating (makes this script safe to re-run)
+DROP POLICY IF EXISTS "etms_auth" ON employees;
+DROP POLICY IF EXISTS "etms_auth" ON trainings;
+DROP POLICY IF EXISTS "etms_auth" ON employee_groups;
+DROP POLICY IF EXISTS "etms_auth" ON employee_group_members;
+DROP POLICY IF EXISTS "etms_auth" ON training_schedules;
+DROP POLICY IF EXISTS "etms_auth" ON attendance_records;
+
+-- Allow authenticated users full access to all tables
+CREATE POLICY "etms_auth" ON employees FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "etms_auth" ON trainings FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "etms_auth" ON employee_groups FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "etms_auth" ON employee_group_members FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "etms_auth" ON training_schedules FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "etms_auth" ON attendance_records FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Seed employees
+INSERT INTO employees (id, employee_code, name, email, department, role) VALUES
+  ('a0000000-0000-0000-0000-000000000001','EMP-001','Sarah Chen','s.chen@trainova.com','Engineering','Engineering Lead'),
+  ('a0000000-0000-0000-0000-000000000002','EMP-002','Michael Torres','m.torres@trainova.com','Engineering','Software Engineer'),
+  ('a0000000-0000-0000-0000-000000000003','EMP-003','Aisha Johnson','a.johnson@trainova.com','Engineering','Software Engineer'),
+  ('a0000000-0000-0000-0000-000000000004','EMP-004','Priya Sharma','p.sharma@trainova.com','HR','HR Manager'),
+  ('a0000000-0000-0000-0000-000000000005','EMP-005','Nina Patel','n.patel@trainova.com','HR','HR Coordinator'),
+  ('a0000000-0000-0000-0000-000000000006','EMP-006','James Okafor','j.okafor@trainova.com','Finance','Financial Analyst'),
+  ('a0000000-0000-0000-0000-000000000007','EMP-007','Tom Bradley','t.bradley@trainova.com','Finance','Accountant'),
+  ('a0000000-0000-0000-0000-000000000008','EMP-008','Rachel Green','r.green@trainova.com','Finance','Financial Controller'),
+  ('a0000000-0000-0000-0000-000000000009','EMP-009','Emma Wilson','e.wilson@trainova.com','Operations','Operations Manager'),
+  ('a0000000-0000-0000-0000-000000000010','EMP-010','Carlos Rivera','c.rivera@trainova.com','Operations','Operations Analyst'),
+  ('a0000000-0000-0000-0000-000000000011','EMP-011','David Kim','d.kim@trainova.com','Marketing','Marketing Director'),
+  ('a0000000-0000-0000-0000-000000000012','EMP-012','Sophie Dubois','s.dubois@trainova.com','Marketing','Marketing Specialist'),
+  ('a0000000-0000-0000-0000-000000000013','EMP-013','Kevin O''Brien','k.obrien@trainova.com','IT','IT Manager'),
+  ('a0000000-0000-0000-0000-000000000014','EMP-014','Lisa Anderson','l.anderson@trainova.com','IT','IT Specialist'),
+  ('a0000000-0000-0000-0000-000000000015','EMP-015','Robert Martinez','r.martinez@trainova.com','Legal','Legal Counsel')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed trainings
+INSERT INTO trainings (id, code, name, frequency, description, status, created_by) VALUES
+  ('b0000000-0000-0000-0000-000000000001','T1','Cyber Security Awareness','Quarterly','Covers phishing, password hygiene, social engineering, and secure remote-work practices.','active','Priya Sharma'),
+  ('b0000000-0000-0000-0000-000000000002','T2','Fire Safety Procedures','Quarterly','Emergency evacuation, fire extinguisher use, and building safety protocols.','active','Priya Sharma'),
+  ('b0000000-0000-0000-0000-000000000003','T3','ISO 9001 Quality Awareness','Quarterly','Quality management system principles, documentation standards, and continuous improvement.','active','Priya Sharma'),
+  ('b0000000-0000-0000-0000-000000000004','T4','AI Tools & Productivity','As Required','Hands-on workshop covering LLM tools, AI-assisted workflows, and responsible usage guidelines.','active','Sarah Chen'),
+  ('b0000000-0000-0000-0000-000000000005','T5','Data Privacy & GDPR','Annual','Personal data handling obligations, subject access requests, and breach reporting under GDPR.','active','Robert Martinez'),
+  ('b0000000-0000-0000-0000-000000000006','T6','Workplace Health & Safety','Annual','Ergonomics, manual handling, incident reporting, and mental health awareness.','active','Priya Sharma'),
+  ('b0000000-0000-0000-0000-000000000007','T7','Leadership Essentials','As Required','Performance conversations, delegation, conflict resolution, and inclusive leadership practices.','active','Priya Sharma'),
+  ('b0000000-0000-0000-0000-000000000008','T8','Customer Service Excellence','Annual','Communication skills, handling escalations, SLA adherence, and customer satisfaction metrics.','active','David Kim')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed groups
+INSERT INTO employee_groups (id, name, type, department, description) VALUES
+  ('c0000000-0000-0000-0000-000000000001','All Employees','all',null,'Every active employee in the organisation'),
+  ('c0000000-0000-0000-0000-000000000002','Engineering Team','department','Engineering','All Engineering department members'),
+  ('c0000000-0000-0000-0000-000000000003','Finance & Legal','selected',null,'Finance analysts and legal counsel'),
+  ('c0000000-0000-0000-0000-000000000004','Leadership Team','selected',null,'Department heads and senior managers'),
+  ('c0000000-0000-0000-0000-000000000005','IT & Engineering','selected',null,'Combined IT and Engineering staff')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed group members
+INSERT INTO employee_group_members (group_id, employee_id)
+  SELECT 'c0000000-0000-0000-0000-000000000001', id FROM employees ON CONFLICT DO NOTHING;
+INSERT INTO employee_group_members (group_id, employee_id)
+  SELECT 'c0000000-0000-0000-0000-000000000002', id FROM employees WHERE department = 'Engineering' ON CONFLICT DO NOTHING;
+INSERT INTO employee_group_members (group_id, employee_id) VALUES
+  ('c0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000006'),
+  ('c0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000007'),
+  ('c0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000008'),
+  ('c0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000015'),
+  ('c0000000-0000-0000-0000-000000000004','a0000000-0000-0000-0000-000000000001'),
+  ('c0000000-0000-0000-0000-000000000004','a0000000-0000-0000-0000-000000000004'),
+  ('c0000000-0000-0000-0000-000000000004','a0000000-0000-0000-0000-000000000009'),
+  ('c0000000-0000-0000-0000-000000000004','a0000000-0000-0000-0000-000000000011'),
+  ('c0000000-0000-0000-0000-000000000004','a0000000-0000-0000-0000-000000000013'),
+  ('c0000000-0000-0000-0000-000000000005','a0000000-0000-0000-0000-000000000001'),
+  ('c0000000-0000-0000-0000-000000000005','a0000000-0000-0000-0000-000000000002'),
+  ('c0000000-0000-0000-0000-000000000005','a0000000-0000-0000-0000-000000000003'),
+  ('c0000000-0000-0000-0000-000000000005','a0000000-0000-0000-0000-000000000013'),
+  ('c0000000-0000-0000-0000-000000000005','a0000000-0000-0000-0000-000000000014')
+ON CONFLICT DO NOTHING;
+
+-- Seed schedules
+INSERT INTO training_schedules (id, training_id, group_id, session_date, trainer, frequency, status) VALUES
+  ('d0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000001','c0000000-0000-0000-0000-000000000001','2026-01-15','Alex Foster','Quarterly','completed'),
+  ('d0000000-0000-0000-0000-000000000002','b0000000-0000-0000-0000-000000000002','c0000000-0000-0000-0000-000000000001','2026-02-10','Mark Davies','Quarterly','completed'),
+  ('d0000000-0000-0000-0000-000000000003','b0000000-0000-0000-0000-000000000003','c0000000-0000-0000-0000-000000000001','2026-03-05','Jennifer Lee','Quarterly','completed'),
+  ('d0000000-0000-0000-0000-000000000004','b0000000-0000-0000-0000-000000000004','c0000000-0000-0000-0000-000000000002','2026-04-20','Sarah Chen','As Required','completed'),
+  ('d0000000-0000-0000-0000-000000000005','b0000000-0000-0000-0000-000000000001','c0000000-0000-0000-0000-000000000001','2026-06-15','Alex Foster','Quarterly','completed'),
+  ('d0000000-0000-0000-0000-000000000006','b0000000-0000-0000-0000-000000000002','c0000000-0000-0000-0000-000000000001','2026-06-10','Mark Davies','Quarterly','completed'),
+  ('d0000000-0000-0000-0000-000000000007','b0000000-0000-0000-0000-000000000005','c0000000-0000-0000-0000-000000000001','2026-09-15','Robert Martinez','Annual','upcoming'),
+  ('d0000000-0000-0000-0000-000000000008','b0000000-0000-0000-0000-000000000007','c0000000-0000-0000-0000-000000000004','2026-10-05','Priya Sharma','As Required','upcoming'),
+  ('d0000000-0000-0000-0000-000000000009','b0000000-0000-0000-0000-000000000006','c0000000-0000-0000-0000-000000000001','2026-09-20','Emma Wilson','Annual','upcoming'),
+  ('d0000000-0000-0000-0000-000000000010','b0000000-0000-0000-0000-000000000003','c0000000-0000-0000-0000-000000000001','2026-08-28','Jennifer Lee','Quarterly','in-progress')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seed attendance records
+INSERT INTO attendance_records (schedule_id, employee_id, attendance, completion_status, marked_at)
+  SELECT 'd0000000-0000-0000-0000-000000000001', id, 'present', 'completed', '2026-01-15' FROM employees ON CONFLICT DO NOTHING;
+INSERT INTO attendance_records (schedule_id, employee_id, attendance, completion_status, marked_at)
+  SELECT 'd0000000-0000-0000-0000-000000000002', id,
+    CASE WHEN employee_code IN ('EMP-006','EMP-012') THEN 'absent' ELSE 'present' END,
+    CASE WHEN employee_code IN ('EMP-006','EMP-012') THEN 'overdue' ELSE 'completed' END,
+    '2026-02-10' FROM employees ON CONFLICT DO NOTHING;
+INSERT INTO attendance_records (schedule_id, employee_id, attendance, completion_status, marked_at)
+  SELECT 'd0000000-0000-0000-0000-000000000003', id,
+    CASE WHEN employee_code = 'EMP-010' THEN 'absent' ELSE 'present' END,
+    CASE WHEN employee_code = 'EMP-010' THEN 'overdue' ELSE 'completed' END,
+    '2026-03-05' FROM employees ON CONFLICT DO NOTHING;
+INSERT INTO attendance_records (schedule_id, employee_id, attendance, completion_status, marked_at)
+  SELECT 'd0000000-0000-0000-0000-000000000004', employee_id, 'present', 'completed', '2026-04-20'
+  FROM employee_group_members WHERE group_id = 'c0000000-0000-0000-0000-000000000002' ON CONFLICT DO NOTHING;
+INSERT INTO attendance_records (schedule_id, employee_id, attendance, completion_status, marked_at)
+  SELECT 'd0000000-0000-0000-0000-000000000005', id,
+    CASE WHEN employee_code IN ('EMP-007','EMP-011','EMP-015') THEN 'absent' ELSE 'present' END,
+    CASE WHEN employee_code IN ('EMP-007','EMP-011','EMP-015') THEN 'overdue' ELSE 'completed' END,
+    '2026-06-15' FROM employees ON CONFLICT DO NOTHING;
+INSERT INTO attendance_records (schedule_id, employee_id, attendance, completion_status, marked_at)
+  SELECT 'd0000000-0000-0000-0000-000000000006', id,
+    CASE WHEN employee_code IN ('EMP-003','EMP-014') THEN 'absent' ELSE 'present' END,
+    CASE WHEN employee_code IN ('EMP-003','EMP-014') THEN 'overdue' ELSE 'completed' END,
+    '2026-06-10' FROM employees ON CONFLICT DO NOTHING;
+INSERT INTO attendance_records (schedule_id, employee_id, attendance, completion_status, marked_at)
+  SELECT 'd0000000-0000-0000-0000-000000000010', id,
+    CASE WHEN employee_code IN ('EMP-001','EMP-004','EMP-009') THEN 'present' WHEN employee_code = 'EMP-003' THEN 'absent' ELSE 'not-marked' END,
+    CASE WHEN employee_code IN ('EMP-001','EMP-004','EMP-009') THEN 'completed' ELSE 'overdue' END,
+    CASE WHEN employee_code IN ('EMP-001','EMP-004','EMP-009','EMP-003') THEN '2026-08-28' ELSE null END
+  FROM employees ON CONFLICT DO NOTHING;

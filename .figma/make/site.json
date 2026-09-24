@@ -1,0 +1,10 @@
+{
+  "description": "This web application simplifies project management by enabling users to create, track, and collaborate on tasks efficiently, enhancing productivity for teams.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
